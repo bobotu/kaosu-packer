@@ -1,0 +1,11 @@
+[package]
+name = "kaosu-packer"
+description = "あばばばばばばばばば"
+version = "0.1.0"
+authors = ["Zejun Li <me@zejun.li>"]
+edition = "2018"
+
+[dependencies]
+yew = "0.5.0"
+stdweb = "0.4.13"
+rand = "0.6"
