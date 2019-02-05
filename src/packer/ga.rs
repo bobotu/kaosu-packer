@@ -58,12 +58,11 @@ where
     D: Decoder,
 {
     pub fn new(params: Params, generator: G, decoder: D) -> Solver<G, D> {
-        let population = Vec::with_capacity(params.population_size);
         Solver {
             generator,
             decoder,
             params,
-            population,
+            population: Vec::new(),
         }
     }
 
@@ -120,8 +119,8 @@ where
         let num_offsprings = params.population_size - params.num_elite - params.num_mutants;
 
         for _ in 0..num_offsprings {
-            let (elite, non_elite) = self.pickup_parents_for_crossover(&mut rng);
-            let offspring = self.crossover(elite, non_elite, &mut rng);
+            let (elite, non_elite) = self.pickup_parents_for_crossover();
+            let offspring = self.crossover(elite, non_elite);
             new_population.push(offspring);
         }
     }
@@ -130,8 +129,8 @@ where
         &self,
         elite: &Chromosome,
         non_elite: &Chromosome,
-        rng: &mut ThreadRng,
     ) -> InnerChromosome<D::Solution> {
+        let mut rng = thread_rng();
         let mut offspring = Vec::with_capacity(elite.len());
         for i in 0..elite.len() {
             let p: f64 = rng.gen();
@@ -142,11 +141,11 @@ where
             };
             offspring.push(gen);
         }
-
         self.evaluate_chromosome(offspring)
     }
 
-    fn pickup_parents_for_crossover(&self, rng: &mut ThreadRng) -> (&Chromosome, &Chromosome) {
+    fn pickup_parents_for_crossover(&self) -> (&Chromosome, &Chromosome) {
+        let mut rng = thread_rng();
         let elite_size = self.params.num_elite;
         let non_elite_size = self.params.population_size - elite_size;
         let elite = &self.population[rng.gen_range(0, elite_size)];
@@ -171,10 +170,12 @@ where
     }
 
     fn init_population(&mut self) {
-        for _ in 0..self.params.population_size {
-            self.population.push(self.random_individual());
-        }
-        Self::sort_population(&mut self.population);
+        let mut population = (0..self.params.population_size)
+            .into_iter()
+            .map(|_| self.random_individual())
+            .collect();
+        Self::sort_population(&mut population);
+        self.population = population;
     }
 
     fn sort_population(population: &mut Vec<InnerChromosome<D::Solution>>) {
