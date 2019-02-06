@@ -10,12 +10,15 @@ impl Point {
         Point { x, y, z }
     }
 
-    pub fn distance_between(&self, other: &Self) -> f64 {
+    pub fn distance_between(&self, other: &Self) -> i32 {
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         let dz = self.z - other.z;
-        let d2 = dx * dx + dy * dy + dz * dz;
-        f64::from(d2).sqrt()
+        dx * dx + dy * dy + dz * dz
+    }
+
+    fn scalar_less_than(&self, other: &Self) -> bool {
+        self.x <= other.x && self.y <= other.y && self.z <= other.z
     }
 }
 
@@ -41,7 +44,7 @@ impl Rectangle {
         }
     }
 
-    pub fn all_rotations(&self) -> Vec<Rectangle> {
+    pub fn orientations(&self) -> Vec<Rectangle> {
         let mut result = Vec::with_capacity(6);
 
         result.push(Self::new(self.width, self.depth, self.height));
@@ -65,6 +68,14 @@ impl Rectangle {
 
         result
     }
+
+    pub fn volume(&self) -> i32 {
+        self.width * self.depth * self.height
+    }
+
+    pub fn can_fit_in(&self, space: &Space) -> bool {
+        space.width() >= self.width && space.height() >= self.height && space.depth() >= self.depth
+    }
 }
 
 impl From<(i32, i32, i32)> for Rectangle {
@@ -87,7 +98,7 @@ impl Space {
         }
     }
 
-    pub fn from_rectangle(origin: &Point, rect: &Rectangle) -> Self {
+    pub fn from_placement(origin: &Point, rect: &Rectangle) -> Self {
         let x = origin.x + rect.width;
         let y = origin.y + rect.depth;
         let z = origin.z + rect.height;
@@ -114,17 +125,14 @@ impl Space {
         self.upper_right.z - self.bottom_left.z
     }
 
-    pub fn contains(&self, rect: &Rectangle) -> bool {
-        self.width() >= rect.width && self.height() >= rect.height && self.depth() >= rect.depth
+    pub fn contains(&self, other: &Self) -> bool {
+        self.bottom_left.scalar_less_than(&other.bottom_left)
+            && other.upper_right.scalar_less_than(&self.upper_right)
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.bottom_left.x <= other.upper_right.x
-            && self.bottom_left.y <= other.upper_right.y
-            && self.bottom_left.z <= other.upper_right.z
-            && other.bottom_left.x <= self.upper_right.x
-            && other.bottom_left.y <= self.upper_right.y
-            && other.bottom_left.z <= self.upper_right.z
+        self.bottom_left.scalar_less_than(&other.upper_right)
+            && other.bottom_left.scalar_less_than(&self.upper_right)
     }
 
     pub fn union(&self, other: &Self) -> Self {
@@ -135,10 +143,31 @@ impl Space {
         let uy = self.upper_right.y.min(other.upper_right.y);
         let uz = self.upper_right.z.min(other.upper_right.z);
 
-        Space {
-            bottom_left: Point::new(bx, by, bz),
-            upper_right: Point::new(ux, uy, uz),
-        }
+        Space::new(Point::new(bx, by, bz), Point::new(ux, uy, uz))
+    }
+
+    pub fn difference_process<F>(&self, other: &Self, mut new_space_filter: F) -> Vec<Self>
+    where
+        F: FnMut(&Self) -> bool,
+    {
+        let (sb, su, ob, ou) = (
+            &self.bottom_left,
+            &self.upper_right,
+            &other.bottom_left,
+            &other.upper_right,
+        );
+        [
+            Space::new(sb.clone(), (ob.x, su.y, su.z).into()),
+            Space::new((ou.x, sb.y, sb.z).into(), su.clone()),
+            Space::new(sb.clone(), (su.x, ob.y, su.z).into()),
+            Space::new((sb.x, ou.y, sb.z).into(), su.clone()),
+            Space::new(sb.clone(), (su.x, su.y, ob.z).into()),
+            Space::new((sb.x, sb.y, ou.z).into(), su.clone()),
+        ]
+        .iter()
+        .filter(|ns| ns.width().min(ns.depth()).min(ns.height()) != 0 && new_space_filter(ns))
+        .cloned()
+        .collect()
     }
 }
 
@@ -147,19 +176,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rect_rotation() {
-        assert_eq!(1, Rectangle::new(2, 2, 2).all_rotations().len());
+    fn test_rect_orientation() {
+        assert_eq!(1, Rectangle::new(2, 2, 2).orientations().len());
 
-        assert_eq!(3, Rectangle::new(2, 2, 3).all_rotations().len());
-        assert_eq!(3, Rectangle::new(2, 3, 2).all_rotations().len());
-        assert_eq!(3, Rectangle::new(3, 2, 2).all_rotations().len());
+        assert_eq!(3, Rectangle::new(2, 2, 3).orientations().len());
+        assert_eq!(3, Rectangle::new(2, 3, 2).orientations().len());
+        assert_eq!(3, Rectangle::new(3, 2, 2).orientations().len());
 
-        assert_eq!(6, Rectangle::new(1, 2, 3).all_rotations().len());
-        assert_eq!(6, Rectangle::new(1, 3, 2).all_rotations().len());
-        assert_eq!(6, Rectangle::new(2, 1, 3).all_rotations().len());
-        assert_eq!(6, Rectangle::new(2, 3, 1).all_rotations().len());
-        assert_eq!(6, Rectangle::new(3, 2, 1).all_rotations().len());
-        assert_eq!(6, Rectangle::new(3, 1, 2).all_rotations().len());
+        assert_eq!(6, Rectangle::new(1, 2, 3).orientations().len());
+        assert_eq!(6, Rectangle::new(1, 3, 2).orientations().len());
+        assert_eq!(6, Rectangle::new(2, 1, 3).orientations().len());
+        assert_eq!(6, Rectangle::new(2, 3, 1).orientations().len());
+        assert_eq!(6, Rectangle::new(3, 2, 1).orientations().len());
+        assert_eq!(6, Rectangle::new(3, 1, 2).orientations().len());
     }
 
     #[test]

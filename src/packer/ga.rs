@@ -5,7 +5,7 @@ pub type Chromosome = Vec<f32>;
 #[derive(Copy, Clone, Debug)]
 pub struct Params {
     pub population_size: usize,
-    pub num_elite: usize,
+    pub num_elites: usize,
     pub num_mutants: usize,
     pub inherit_elite_probability: f64,
     pub max_generations: i32,
@@ -25,11 +25,11 @@ pub trait Generator {
 
 #[derive(Copy, Clone, Debug)]
 pub struct RandGenerator {
-    length: i32,
+    length: usize,
 }
 
 impl RandGenerator {
-    pub fn new(length: i32) -> RandGenerator {
+    pub fn new(length: usize) -> RandGenerator {
         RandGenerator { length }
     }
 }
@@ -102,7 +102,7 @@ where
     }
 
     fn fill_elites(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        for elite in &self.population[0..self.params.num_elite] {
+        for elite in &self.population[0..self.params.num_elites] {
             new_population.push(elite.clone());
         }
     }
@@ -114,9 +114,8 @@ where
     }
 
     fn fill_offsprings(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        let mut rng = thread_rng();
         let params = &self.params;
-        let num_offsprings = params.population_size - params.num_elite - params.num_mutants;
+        let num_offsprings = params.population_size - params.num_elites - params.num_mutants;
 
         for _ in 0..num_offsprings {
             let (elite, non_elite) = self.pickup_parents_for_crossover();
@@ -146,7 +145,7 @@ where
 
     fn pickup_parents_for_crossover(&self) -> (&Chromosome, &Chromosome) {
         let mut rng = thread_rng();
-        let elite_size = self.params.num_elite;
+        let elite_size = self.params.num_elites;
         let non_elite_size = self.params.population_size - elite_size;
         let elite = &self.population[rng.gen_range(0, elite_size)];
         let non_elite = &self.population[elite_size + rng.gen_range(0, non_elite_size)];
@@ -216,7 +215,7 @@ mod tests {
     fn naive_test() {
         let params = Params {
             population_size: 10,
-            num_elite: 3,
+            num_elites: 3,
             num_mutants: 2,
             inherit_elite_probability: 0.6,
             max_generations: 10,

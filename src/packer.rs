@@ -1,2 +1,121 @@
 mod ga;
 mod geometry;
+mod inner;
+mod placer;
+
+use self::ga::*;
+use self::geometry::*;
+use self::inner::*;
+use self::placer::Placer;
+
+pub fn pack_boxes<'a, T>(
+    params: Params,
+    bin_spec: Dimension,
+    boxes: &'a [T],
+) -> Vec<Vec<Placement<'a, T>>>
+where
+    &'a T: Into<Dimension>,
+{
+    let decoder = Decoder::new(boxes, bin_spec);
+    let generator = RandGenerator::new(boxes.len() * 2);
+    let mut solver = Solver::new(params, generator, decoder);
+    let solution = solver.solve();
+
+    let mut bins = vec![Vec::new(); solution.num_bins];
+    for inner_placement in &solution.placements {
+        let idx = inner_placement.bin_no;
+        let space = inner_placement.space;
+        let item = &boxes[inner_placement.box_idx];
+        bins[idx].push(Placement { space, item })
+    }
+    bins
+}
+
+pub fn recommend_params(problem_size: usize) -> Params {
+    let population_size = 30 * problem_size;
+    Params {
+        population_size,
+        num_elites: (0.10 * population_size as f64) as usize,
+        num_mutants: (0.15 * population_size as f64) as usize,
+        inherit_elite_probability: 0.70,
+        max_generations: 200,
+        max_generations_no_improvement: 5,
+    }
+}
+
+pub struct Placement<'a, T> {
+    pub space: Space,
+    pub item: &'a T,
+}
+
+impl<T> Clone for Placement<'_, T> {
+    fn clone(&self) -> Self {
+        Placement {
+            space: self.space,
+            item: self.item,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Dimension {
+    pub width: i32,
+    pub depth: i32,
+    pub height: i32,
+}
+
+impl Dimension {
+    pub fn new(width: i32, depth: i32, height: i32) -> Self {
+        Dimension {
+            width,
+            depth,
+            height,
+        }
+    }
+}
+
+impl From<&(i32, i32, i32)> for Dimension {
+    fn from(t: &(i32, i32, i32)) -> Self {
+        Self::new(t.0, t.1, t.2)
+    }
+}
+
+impl Into<Rectangle> for Dimension {
+    fn into(self) -> Rectangle {
+        Rectangle::new(self.width, self.depth, self.height)
+    }
+}
+
+struct Decoder {
+    boxes: Vec<InnerBox>,
+    bin_spec: Rectangle,
+    bin_volume: i32,
+}
+
+impl Decoder {
+    fn new<'a, T: 'a>(boxes: &'a [T], bin_spec: Dimension) -> Self
+    where
+        &'a T: Into<Dimension>,
+    {
+        let boxes = boxes.iter().map(|b| b.into().into()).collect();
+        let bin_spec: Rectangle = bin_spec.into();
+        let bin_volume = bin_spec.volume();
+        Decoder {
+            boxes,
+            bin_spec,
+            bin_volume,
+        }
+    }
+}
+
+impl ga::Decoder for Decoder {
+    type Solution = InnerSolution;
+
+    fn decode_chromosome(&self, individual: &Chromosome) -> Self::Solution {
+        Placer::new(individual, &self.boxes, &self.bin_spec).place_boxes()
+    }
+
+    fn fitness_of(&self, solution: &Self::Solution) -> f64 {
+        solution.num_bins as f64 + (solution.least_load as f64 / self.bin_volume as f64)
+    }
+}
