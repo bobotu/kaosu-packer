@@ -5,15 +5,11 @@ use super::inner::*;
 pub struct Placer<'a, 'b> {
     chromosome: &'a Chromosome,
     bin_spec: &'b Rectangle,
-    boxes: &'b Vec<InnerBox>,
+    boxes: &'b [InnerBox],
 }
 
 impl<'a, 'b> Placer<'a, 'b> {
-    pub fn new(
-        chromosome: &'a Chromosome,
-        boxes: &'b Vec<InnerBox>,
-        bin_spec: &'b Rectangle,
-    ) -> Self {
+    pub fn new(chromosome: &'a Chromosome, boxes: &'b [InnerBox], bin_spec: &'b Rectangle) -> Self {
         Placer {
             chromosome,
             boxes,

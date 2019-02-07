@@ -116,6 +116,6 @@ impl ga::Decoder for Decoder {
     }
 
     fn fitness_of(&self, solution: &Self::Solution) -> f64 {
-        solution.num_bins as f64 + (solution.least_load as f64 / self.bin_volume as f64)
+        solution.num_bins as f64 + (f64::from(solution.least_load) / f64::from(self.bin_volume))
     }
 }

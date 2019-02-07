@@ -100,11 +100,11 @@ impl Space {
 
     pub fn from_placement(origin: &Point, rect: &Rectangle) -> Self {
         let x = origin.x + rect.width;
-        let y = origin.y + rect.depth;
-        let z = origin.z + rect.height;
+        let y = origin.y + rect.height;
+        let z = origin.z + rect.depth;
 
         Space {
-            bottom_left: origin.clone(),
+            bottom_left: *origin,
             upper_right: Point::new(x, y, z),
         }
     }
@@ -118,11 +118,11 @@ impl Space {
     }
 
     pub fn depth(&self) -> i32 {
-        self.upper_right.y - self.bottom_left.y
+        self.upper_right.z - self.bottom_left.z
     }
 
     pub fn height(&self) -> i32 {
-        self.upper_right.z - self.bottom_left.z
+        self.upper_right.y - self.bottom_left.y
     }
 
     pub fn contains(&self, other: &Self) -> bool {
@@ -157,12 +157,12 @@ impl Space {
             &other.upper_right,
         );
         [
-            Space::new(sb.clone(), (ob.x, su.y, su.z).into()),
-            Space::new((ou.x, sb.y, sb.z).into(), su.clone()),
-            Space::new(sb.clone(), (su.x, ob.y, su.z).into()),
-            Space::new((sb.x, ou.y, sb.z).into(), su.clone()),
-            Space::new(sb.clone(), (su.x, su.y, ob.z).into()),
-            Space::new((sb.x, sb.y, ou.z).into(), su.clone()),
+            Space::new(*sb, (ob.x, su.y, su.z).into()),
+            Space::new((ou.x, sb.y, sb.z).into(), *su),
+            Space::new(*sb, (su.x, ob.y, su.z).into()),
+            Space::new((sb.x, ou.y, sb.z).into(), *su),
+            Space::new(*sb, (su.x, su.y, ob.z).into()),
+            Space::new((sb.x, sb.y, ou.z).into(), *su),
         ]
         .iter()
         .filter(|ns| ns.width().min(ns.depth()).min(ns.height()) != 0 && new_space_filter(ns))

@@ -170,7 +170,6 @@ where
 
     fn init_population(&mut self) {
         let mut population = (0..self.params.population_size)
-            .into_iter()
             .map(|_| self.random_individual())
             .collect();
         Self::sort_population(&mut population);
