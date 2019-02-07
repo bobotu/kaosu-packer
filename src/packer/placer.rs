@@ -6,14 +6,21 @@ pub struct Placer<'a, 'b> {
     chromosome: &'a Chromosome,
     bin_spec: &'b Rectangle,
     boxes: &'b [InnerBox],
+    rotation_type: RotationType,
 }
 
 impl<'a, 'b> Placer<'a, 'b> {
-    pub fn new(chromosome: &'a Chromosome, boxes: &'b [InnerBox], bin_spec: &'b Rectangle) -> Self {
+    pub fn new(
+        chromosome: &'a Chromosome,
+        boxes: &'b [InnerBox],
+        bin_spec: &'b Rectangle,
+        rotation_type: RotationType,
+    ) -> Self {
         Placer {
             chromosome,
             boxes,
             bin_spec,
+            rotation_type,
         }
     }
 
@@ -27,7 +34,10 @@ impl<'a, 'b> Placer<'a, 'b> {
             let (mut fit_bin, mut fit_space) = (None, None);
 
             for (i, bin) in bins.iter_mut().enumerate() {
-                if let Some(space) = bin.0.find_best_space_for_box(&box_to_pack.rect) {
+                if let Some(space) = bin
+                    .0
+                    .find_best_space_for_box(&box_to_pack.rect, self.rotation_type)
+                {
                     fit_space = Some(space);
                     fit_bin = Some(i);
                     break;
@@ -63,7 +73,7 @@ impl<'a, 'b> Placer<'a, 'b> {
         let rect = &self.boxes[box_idx].rect;
         let gene = self.vbo(box_idx);
         let orientations = rect
-            .orientations()
+            .orientations(self.rotation_type)
             .into_iter()
             .filter(|rect| rect.can_fit_in(container))
             .collect::<Vec<_>>();
@@ -113,11 +123,15 @@ impl Bin {
         }
     }
 
-    fn find_best_space_for_box(&self, rect: &Rectangle) -> Option<&Space> {
+    fn find_best_space_for_box(
+        &self,
+        rect: &Rectangle,
+        rotation_type: RotationType,
+    ) -> Option<&Space> {
         let mut max_dist = -1;
         let mut best_ems = None;
 
-        let orientations = rect.orientations();
+        let orientations = rect.orientations(rotation_type);
         let container_upper_right = Point::new(self.spec.width, self.spec.depth, self.spec.height);
 
         for ems in &self.empty_space_list {

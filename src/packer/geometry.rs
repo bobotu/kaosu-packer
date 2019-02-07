@@ -35,6 +35,12 @@ pub struct Rectangle {
     pub height: i32,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum RotationType {
+    ThreeDimension,
+    TwoDimension,
+}
+
 impl Rectangle {
     pub fn new(width: i32, depth: i32, height: i32) -> Self {
         Rectangle {
@@ -44,25 +50,32 @@ impl Rectangle {
         }
     }
 
-    pub fn orientations(&self) -> Vec<Rectangle> {
-        let mut result = Vec::with_capacity(6);
+    pub fn orientations(&self, tp: RotationType) -> Vec<Rectangle> {
+        use self::RotationType::*;
+        let only_2d = match tp {
+            TwoDimension => true,
+            _ => false,
+        };
+        let mut result = Vec::with_capacity(if only_2d { 2 } else { 6 });
 
         result.push(Self::new(self.width, self.depth, self.height));
         if self.width != self.depth {
             result.push(Self::new(self.depth, self.width, self.height));
         }
 
-        if self.height != self.depth {
-            result.push(Self::new(self.width, self.height, self.depth));
-            if self.height != self.width {
-                result.push(Self::new(self.height, self.width, self.depth))
-            }
-        }
-
-        if self.width != self.depth && self.height != self.width {
-            result.push(Self::new(self.height, self.depth, self.width));
+        if !only_2d {
             if self.height != self.depth {
-                result.push(Self::new(self.depth, self.height, self.width));
+                result.push(Self::new(self.width, self.height, self.depth));
+                if self.height != self.width {
+                    result.push(Self::new(self.height, self.width, self.depth))
+                }
+            }
+
+            if self.width != self.depth && self.height != self.width {
+                result.push(Self::new(self.height, self.depth, self.width));
+                if self.height != self.depth {
+                    result.push(Self::new(self.depth, self.height, self.width));
+                }
             }
         }
 
@@ -173,22 +186,53 @@ impl Space {
 
 #[cfg(test)]
 mod tests {
+    use super::RotationType::*;
     use super::*;
 
     #[test]
     fn test_rect_orientation() {
-        assert_eq!(1, Rectangle::new(2, 2, 2).orientations().len());
+        assert_eq!(
+            1,
+            Rectangle::new(2, 2, 2).orientations(ThreeDimension).len()
+        );
 
-        assert_eq!(3, Rectangle::new(2, 2, 3).orientations().len());
-        assert_eq!(3, Rectangle::new(2, 3, 2).orientations().len());
-        assert_eq!(3, Rectangle::new(3, 2, 2).orientations().len());
+        assert_eq!(
+            3,
+            Rectangle::new(2, 2, 3).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            3,
+            Rectangle::new(2, 3, 2).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            3,
+            Rectangle::new(3, 2, 2).orientations(ThreeDimension).len()
+        );
 
-        assert_eq!(6, Rectangle::new(1, 2, 3).orientations().len());
-        assert_eq!(6, Rectangle::new(1, 3, 2).orientations().len());
-        assert_eq!(6, Rectangle::new(2, 1, 3).orientations().len());
-        assert_eq!(6, Rectangle::new(2, 3, 1).orientations().len());
-        assert_eq!(6, Rectangle::new(3, 2, 1).orientations().len());
-        assert_eq!(6, Rectangle::new(3, 1, 2).orientations().len());
+        assert_eq!(
+            6,
+            Rectangle::new(1, 2, 3).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            6,
+            Rectangle::new(1, 3, 2).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            6,
+            Rectangle::new(2, 1, 3).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            6,
+            Rectangle::new(2, 3, 1).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            6,
+            Rectangle::new(3, 2, 1).orientations(ThreeDimension).len()
+        );
+        assert_eq!(
+            6,
+            Rectangle::new(3, 1, 2).orientations(ThreeDimension).len()
+        );
     }
 
     #[test]

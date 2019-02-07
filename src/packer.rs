@@ -3,10 +3,28 @@ mod geometry;
 mod inner;
 mod placer;
 
-use self::ga::*;
+use self::ga::{Chromosome, RandGenerator, Solver};
 use self::geometry::*;
 use self::inner::*;
 use self::placer::Placer;
+
+pub type GAParams = ga::Params;
+pub use self::geometry::RotationType;
+
+#[derive(Copy, Clone, Debug)]
+pub struct Params {
+    pub ga_params: GAParams,
+    pub box_rotation_type: RotationType,
+}
+
+impl Params {
+    pub fn new(ga_params: GAParams, box_rotation_type: RotationType) -> Self {
+        Params {
+            ga_params,
+            box_rotation_type,
+        }
+    }
+}
 
 pub fn pack_boxes<'a, T>(
     params: Params,
@@ -16,9 +34,9 @@ pub fn pack_boxes<'a, T>(
 where
     &'a T: Into<Dimension>,
 {
-    let decoder = Decoder::new(boxes, bin_spec);
+    let decoder = Decoder::new(boxes, bin_spec, params.box_rotation_type);
     let generator = RandGenerator::new(boxes.len() * 2);
-    let mut solver = Solver::new(params, generator, decoder);
+    let mut solver = Solver::new(params.ga_params, generator, decoder);
     let solution = solver.solve();
 
     let mut bins = vec![Vec::new(); solution.num_bins];
@@ -31,9 +49,9 @@ where
     bins
 }
 
-pub fn recommend_params(problem_size: usize) -> Params {
+pub fn recommend_ga_params(problem_size: usize) -> GAParams {
     let population_size = 30 * problem_size;
-    Params {
+    GAParams {
         population_size,
         num_elites: (0.10 * population_size as f64) as usize,
         num_mutants: (0.15 * population_size as f64) as usize,
@@ -90,10 +108,11 @@ struct Decoder {
     boxes: Vec<InnerBox>,
     bin_spec: Rectangle,
     bin_volume: i32,
+    rotation_type: RotationType,
 }
 
 impl Decoder {
-    fn new<'a, T: 'a>(boxes: &'a [T], bin_spec: Dimension) -> Self
+    fn new<'a, T: 'a>(boxes: &'a [T], bin_spec: Dimension, rotation_type: RotationType) -> Self
     where
         &'a T: Into<Dimension>,
     {
@@ -104,6 +123,7 @@ impl Decoder {
             boxes,
             bin_spec,
             bin_volume,
+            rotation_type,
         }
     }
 }
@@ -112,7 +132,7 @@ impl ga::Decoder for Decoder {
     type Solution = InnerSolution;
 
     fn decode_chromosome(&self, individual: &Chromosome) -> Self::Solution {
-        Placer::new(individual, &self.boxes, &self.bin_spec).place_boxes()
+        Placer::new(individual, &self.boxes, &self.bin_spec, self.rotation_type).place_boxes()
     }
 
     fn fitness_of(&self, solution: &Self::Solution) -> f64 {
