@@ -24,20 +24,45 @@ use self::geometry::*;
 use self::inner::*;
 use self::placer::Placer;
 
-pub type GAParams = ga::Params;
 pub use self::geometry::RotationType;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Params {
-    pub ga_params: GAParams,
+    pub population_factor: usize,
+    pub elites_percentage: f64,
+    pub mutants_percentage: f64,
+    pub inherit_elite_probability: f64,
+    pub max_generations: i32,
+    pub max_generations_no_improvement: i32,
     pub box_rotation_type: RotationType,
 }
 
-impl Params {
-    pub fn new(ga_params: GAParams, box_rotation_type: RotationType) -> Self {
+impl Default for Params {
+    fn default() -> Self {
         Params {
-            ga_params,
-            box_rotation_type,
+            population_factor: 30,
+            elites_percentage: 0.10,
+            mutants_percentage: 0.15,
+            inherit_elite_probability: 0.70,
+            max_generations: 200,
+            max_generations_no_improvement: 5,
+            box_rotation_type: RotationType::ThreeDimension,
+        }
+    }
+}
+
+impl Params {
+    fn get_ga_params(&self, num_items: usize) -> ga::Params {
+        let population_size = self.population_factor * num_items;
+        let num_elites = (self.elites_percentage * population_size as f64) as usize;
+        let num_mutants = (self.mutants_percentage * population_size as f64) as usize;
+        ga::Params {
+            population_size,
+            num_elites,
+            num_mutants,
+            inherit_elite_probability: self.inherit_elite_probability,
+            max_generations: self.max_generations,
+            max_generations_no_improvement: self.max_generations_no_improvement,
         }
     }
 }
@@ -52,7 +77,8 @@ where
 {
     let decoder = Decoder::new(boxes, bin_spec, params.box_rotation_type);
     let generator = RandGenerator::new(boxes.len() * 2);
-    let mut solver = Solver::new(params.ga_params, generator, decoder);
+    let ga_params = params.get_ga_params(boxes.len());
+    let mut solver = Solver::new(ga_params, generator, decoder);
     let solution = solver.solve();
 
     let mut bins = vec![Vec::new(); solution.num_bins];
@@ -63,18 +89,6 @@ where
         bins[idx].push(Placement { space, item })
     }
     bins
-}
-
-pub fn recommend_ga_params(problem_size: usize) -> GAParams {
-    let population_size = 30 * problem_size;
-    GAParams {
-        population_size,
-        num_elites: (0.10 * population_size as f64) as usize,
-        num_mutants: (0.15 * population_size as f64) as usize,
-        inherit_elite_probability: 0.70,
-        max_generations: 200,
-        max_generations_no_improvement: 5,
-    }
 }
 
 pub struct Placement<'a, T> {

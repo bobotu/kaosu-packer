@@ -15,5 +15,5 @@
  */
 
 fn main() {
-    println!("Hello, world!");
+    kaosu_packer::start_app();
 }

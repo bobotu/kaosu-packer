@@ -7,7 +7,10 @@ edition = "2018"
 
 [dependencies]
 yew = "0.5.0"
-stdweb = "0.4.13"
+stdweb = "0.4"
+csv = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+quick-error = "1.2"
 
 [dependencies.rand]
 version = "0.6"

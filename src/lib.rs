@@ -14,4 +14,17 @@
  * limitations under the License.
  */
 
+#![recursion_limit = "512"]
+
+#[macro_use]
+extern crate yew;
+#[macro_use]
+extern crate stdweb;
+#[macro_use]
+extern crate quick_error;
+
 pub mod packer;
+pub mod web;
+
+pub use self::packer::pack_boxes;
+pub use self::web::start_app;
