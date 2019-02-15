@@ -16,6 +16,7 @@ deploy:
 	@cp ${RELEASE_DIR}/worker.wasm ${DEPLOY_DIR}
 	@cp ${STATIC_DIR}/index.html ${DEPLOY_DIR}
 	@cp ${STATIC_DIR}/style.css ${DEPLOY_DIR}
+	@cp ${STATIC_DIR}/TrackballControls.js ${DEPLOY_DIR}
 
 dev:
 	@cargo web build --bin worker

@@ -16,7 +16,7 @@
 
 use serde::*;
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Point {
     pub x: i32,
     pub y: i32,
@@ -115,7 +115,7 @@ impl From<(i32, i32, i32)> for Rectangle {
     }
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Space {
     pub bottom_left: Point,
     pub upper_right: Point,
@@ -142,6 +142,13 @@ impl Space {
 
     pub fn origin(&self) -> &Point {
         &self.bottom_left
+    }
+
+    pub fn center(&self) -> (f64, f64, f64) {
+        let x = (f64::from(self.upper_right.x) + f64::from(self.bottom_left.x)) / 2.;
+        let y = (f64::from(self.upper_right.y) + f64::from(self.bottom_left.y)) / 2.;
+        let z = (f64::from(self.upper_right.z) + f64::from(self.bottom_left.z)) / 2.;
+        (x, y, z)
     }
 
     pub fn width(&self) -> i32 {

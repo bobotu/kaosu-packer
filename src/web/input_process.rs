@@ -222,7 +222,7 @@ impl BoxGroup {
 impl Renderable<InputProcess> for InputProcess {
     fn view(&self) -> Html<InputProcess> {
         html! {
-            <main>
+            <main id="input-process",>
                 <div id="data-input",>
                     { self.view_container_spec() }
                     { self.view_csv_picker() }

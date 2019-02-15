@@ -17,7 +17,7 @@
 use serde::*;
 use yew::prelude::worker::*;
 
-use crate::packer::{pack_boxes, Placement};
+use crate::packer::pack_boxes;
 
 use super::inner::*;
 
@@ -37,10 +37,10 @@ impl From<DataSpec> for Request {
 impl Transferable for Request {}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Response(Vec<Vec<Placement<Item>>>);
+pub struct Response(Solution);
 
-impl Into<Vec<Vec<Placement<Item>>>> for Response {
-    fn into(self) -> Vec<Vec<Placement<Item>>> {
+impl Into<Solution> for Response {
+    fn into(self) -> Solution {
         self.0
     }
 }

@@ -94,13 +94,13 @@ where
     bins
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
 pub struct Placement<T> {
     pub space: Space,
     pub item: T,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Default, Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Dimension {
     pub width: i32,
     pub depth: i32,

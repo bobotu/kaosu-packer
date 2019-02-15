@@ -18,18 +18,22 @@ use yew::prelude::*;
 
 mod inner;
 mod input_process;
+mod three;
+mod visualize;
 mod worker;
 
-use crate::packer::Placement;
-
 use self::inner::*;
-use self::input_process::*;
+use self::input_process::InputProcess;
+use self::visualize::Visualize;
+use crate::Dimension;
 
 pub use self::worker::Worker;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub enum Msg {
     Submit(DataSpec),
-    PackResult(Vec<Vec<Placement<Item>>>),
+    PackResult(Solution),
 }
 
 enum Page {
@@ -40,7 +44,8 @@ enum Page {
 
 pub struct App {
     pack_worker: Box<Bridge<worker::Worker>>,
-    pack_solution: Vec<Vec<Placement<Item>>>,
+    bin_spec: Option<Dimension>,
+    pack_solution: Rc<RefCell<Solution>>,
     page: Page,
 }
 
@@ -53,7 +58,8 @@ impl Component for App {
         let pack_worker = worker::Worker::bridge(callback);
         App {
             pack_worker,
-            pack_solution: Vec::new(),
+            pack_solution: Rc::new(RefCell::new(Vec::new())),
+            bin_spec: None,
             page: Page::InputProcess,
         }
     }
@@ -61,12 +67,13 @@ impl Component for App {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Submit(spec) => {
+                self.bin_spec = Some(spec.bin_spec);
                 self.pack_worker.send(spec.into());
                 self.page = Page::Computing;
                 true
             }
             Msg::PackResult(solution) => {
-                self.pack_solution = solution;
+                self.pack_solution.replace(solution);
                 self.page = Page::Visualize;
                 true
             }
@@ -77,7 +84,9 @@ impl Component for App {
 impl Renderable<App> for App {
     fn view(&self) -> Html<Self> {
         match self.page {
-            Page::InputProcess => html! { <InputProcess: onsubmit=Msg::Submit,/> },
+            Page::InputProcess => html! {
+                <InputProcess: onsubmit=Msg::Submit,/>
+            },
             Page::Computing => html! {
                 <div id="packing",>
                     <i class="fa fa-spinner fa-5x fa-pulse fa-fw", aria-hidden="true",></i>
@@ -85,7 +94,8 @@ impl Renderable<App> for App {
                 </div>
             },
             Page::Visualize => html! {
-                <p> { format!{"{:?}", self.pack_solution} } </p>
+                <Visualize: solution=self.pack_solution.clone(),
+                            bin_spec=self.bin_spec.unwrap(),/>
             },
         }
     }

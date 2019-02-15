@@ -47,7 +47,7 @@ quick_error! {
 
 pub type Result<T> = StdResult<T, Error>;
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Item {
     pub width: i32,
     pub depth: i32,
@@ -83,3 +83,5 @@ impl DataSpec {
         })
     }
 }
+
+pub type Solution = Vec<Vec<Placement<Item>>>;
