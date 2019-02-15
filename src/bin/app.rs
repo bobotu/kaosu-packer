@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-#![recursion_limit = "512"]
+use kaosu_packer::web;
+use yew::prelude::*;
 
-#[macro_use]
-extern crate yew;
-#[macro_use]
-extern crate stdweb;
-#[macro_use]
-extern crate quick_error;
-
-pub mod packer;
-pub mod web;
+fn main() {
+    yew::initialize();
+    App::<web::App>::new().mount_to_body();
+    yew::run_loop();
+}

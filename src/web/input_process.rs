@@ -18,34 +18,12 @@ use std::error::Error;
 use std::iter;
 use std::str::FromStr;
 
-use super::inner::{Error::*, Item, Result};
+use super::inner::Error::*;
+use super::inner::*;
 use crate::packer::*;
 use serde::*;
 use stdweb::{unstable::*, web::*};
 use yew::prelude::*;
-
-#[derive(Clone, Debug)]
-pub struct DataSpec {
-    pub params: Params,
-    pub bin_spec: Dimension,
-    pub items: Vec<Item>,
-}
-
-impl DataSpec {
-    pub fn new(params: Params, bin_spec: Dimension, items: Vec<Item>) -> Result<Self> {
-        if items.is_empty() {
-            return Err(NoBoxToBePack);
-        }
-        if bin_spec.height <= 0 || bin_spec.depth <= 0 || bin_spec.width <= 0 {
-            return Err(InvalidBinSpec);
-        }
-        Ok(DataSpec {
-            params,
-            bin_spec,
-            items,
-        })
-    }
-}
 
 #[derive(PartialEq, Clone, Default)]
 pub struct Props {

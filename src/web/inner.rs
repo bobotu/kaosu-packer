@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-use crate::packer::Dimension;
 use std::result::Result as StdResult;
+
+use serde::*;
+
+use crate::packer::*;
 
 quick_error! {
     #[derive(Debug)]
@@ -44,7 +47,7 @@ quick_error! {
 
 pub type Result<T> = StdResult<T, Error>;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Item {
     pub width: i32,
     pub depth: i32,
@@ -55,5 +58,28 @@ pub struct Item {
 impl Into<Dimension> for &Item {
     fn into(self) -> Dimension {
         Dimension::new(self.width, self.depth, self.height)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DataSpec {
+    pub params: Params,
+    pub bin_spec: Dimension,
+    pub items: Vec<Item>,
+}
+
+impl DataSpec {
+    pub fn new(params: Params, bin_spec: Dimension, items: Vec<Item>) -> Result<Self> {
+        if items.is_empty() {
+            return Err(Error::NoBoxToBePack);
+        }
+        if bin_spec.height <= 0 || bin_spec.depth <= 0 || bin_spec.width <= 0 {
+            return Err(Error::InvalidBinSpec);
+        }
+        Ok(DataSpec {
+            params,
+            bin_spec,
+            items,
+        })
     }
 }

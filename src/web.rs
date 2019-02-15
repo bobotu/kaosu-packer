@@ -18,38 +18,75 @@ use yew::prelude::*;
 
 mod inner;
 mod input_process;
+mod worker;
 
+use crate::packer::Placement;
+
+use self::inner::*;
 use self::input_process::*;
 
-pub fn start_app() {
-    yew::initialize();
-    App::<Model>::new().mount_to_body();
-    yew::run_loop();
-}
+pub use self::worker::Worker;
 
-struct Model {}
-
-enum Msg {
+pub enum Msg {
     Submit(DataSpec),
+    PackResult(Vec<Vec<Placement<Item>>>),
 }
 
-impl Component for Model {
+enum Page {
+    InputProcess,
+    Computing,
+    Visualize,
+}
+
+pub struct App {
+    pack_worker: Box<Bridge<worker::Worker>>,
+    pack_solution: Vec<Vec<Placement<Item>>>,
+    page: Page,
+}
+
+impl Component for App {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
-        Model {}
+    fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+        let callback = link.send_back(|resp: worker::Response| Msg::PackResult(resp.into()));
+        let pack_worker = worker::Worker::bridge(callback);
+        App {
+            pack_worker,
+            pack_solution: Vec::new(),
+            page: Page::InputProcess,
+        }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
-        unimplemented!()
+        match msg {
+            Msg::Submit(spec) => {
+                self.pack_worker.send(spec.into());
+                self.page = Page::Computing;
+                true
+            }
+            Msg::PackResult(solution) => {
+                self.pack_solution = solution;
+                self.page = Page::Visualize;
+                true
+            }
+        }
     }
 }
 
-impl Renderable<Model> for Model {
+impl Renderable<App> for App {
     fn view(&self) -> Html<Self> {
-        html! {
-            <InputProcess: onsubmit=Msg::Submit,/>
+        match self.page {
+            Page::InputProcess => html! { <InputProcess: onsubmit=Msg::Submit,/> },
+            Page::Computing => html! {
+                <div id="packing",>
+                    <i class="fa fa-spinner fa-5x fa-pulse fa-fw", aria-hidden="true",></i>
+                    <h3>{"Packing ..."}</h3>
+                </div>
+            },
+            Page::Visualize => html! {
+                <p> { format!{"{:?}", self.pack_solution} } </p>
+            },
         }
     }
 }

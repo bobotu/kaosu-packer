@@ -19,14 +19,16 @@ mod geometry;
 mod inner;
 mod placer;
 
+use serde::*;
+
 use self::ga::{Chromosome, RandGenerator, Solver};
 use self::geometry::*;
 use self::inner::*;
 use self::placer::Placer;
 
-pub use self::geometry::RotationType;
+pub use self::geometry::{Point, RotationType, Space};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Params {
     pub population_factor: usize,
     pub elites_percentage: f64,
@@ -71,9 +73,10 @@ pub fn pack_boxes<'a, T>(
     params: Params,
     bin_spec: Dimension,
     boxes: &'a [T],
-) -> Vec<Vec<Placement<'a, T>>>
+) -> Vec<Vec<Placement<T>>>
 where
     &'a T: Into<Dimension>,
+    T: Clone,
 {
     let decoder = Decoder::new(boxes, bin_spec, params.box_rotation_type);
     let generator = RandGenerator::new(boxes.len() * 2);
@@ -85,27 +88,19 @@ where
     for inner_placement in &solution.placements {
         let idx = inner_placement.bin_no;
         let space = inner_placement.space;
-        let item = &boxes[inner_placement.box_idx];
+        let item = boxes[inner_placement.box_idx].clone();
         bins[idx].push(Placement { space, item })
     }
     bins
 }
 
-pub struct Placement<'a, T> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Placement<T> {
     pub space: Space,
-    pub item: &'a T,
+    pub item: T,
 }
 
-impl<T> Clone for Placement<'_, T> {
-    fn clone(&self) -> Self {
-        Placement {
-            space: self.space,
-            item: self.item,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Dimension {
     pub width: i32,
     pub depth: i32,

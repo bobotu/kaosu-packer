@@ -181,7 +181,7 @@ impl Bin {
             .flat_map(|&i| {
                 let ems = &self.empty_space_list[i];
                 let union = ems.union(space);
-                ems.difference_process(&union, |s| new_space_filter(s))
+                difference_process(&ems, &union, |s| new_space_filter(s))
             })
             .collect::<Vec<_>>();
 

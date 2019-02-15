@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-#[derive(Copy, Clone, Debug)]
+use serde::*;
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Point {
     pub x: i32,
     pub y: i32,
@@ -44,14 +46,14 @@ impl From<(i32, i32, i32)> for Point {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Rectangle {
     pub width: i32,
     pub depth: i32,
     pub height: i32,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub enum RotationType {
     ThreeDimension,
     TwoDimension,
@@ -113,7 +115,7 @@ impl From<(i32, i32, i32)> for Rectangle {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct Space {
     pub bottom_left: Point,
     pub upper_right: Point,
@@ -174,30 +176,30 @@ impl Space {
 
         Space::new(Point::new(bx, by, bz), Point::new(ux, uy, uz))
     }
+}
 
-    pub fn difference_process<F>(&self, other: &Self, mut new_space_filter: F) -> Vec<Self>
-    where
-        F: FnMut(&Self) -> bool,
-    {
-        let (sb, su, ob, ou) = (
-            &self.bottom_left,
-            &self.upper_right,
-            &other.bottom_left,
-            &other.upper_right,
-        );
-        [
-            Space::new(*sb, (ob.x, su.y, su.z).into()),
-            Space::new((ou.x, sb.y, sb.z).into(), *su),
-            Space::new(*sb, (su.x, ob.y, su.z).into()),
-            Space::new((sb.x, ou.y, sb.z).into(), *su),
-            Space::new(*sb, (su.x, su.y, ob.z).into()),
-            Space::new((sb.x, sb.y, ou.z).into(), *su),
-        ]
-        .iter()
-        .filter(|ns| ns.width().min(ns.depth()).min(ns.height()) != 0 && new_space_filter(ns))
-        .cloned()
-        .collect()
-    }
+pub fn difference_process<F>(this: &Space, other: &Space, mut new_space_filter: F) -> Vec<Space>
+where
+    F: FnMut(&Space) -> bool,
+{
+    let (sb, su, ob, ou) = (
+        &this.bottom_left,
+        &this.upper_right,
+        &other.bottom_left,
+        &other.upper_right,
+    );
+    [
+        Space::new(*sb, (ob.x, su.y, su.z).into()),
+        Space::new((ou.x, sb.y, sb.z).into(), *su),
+        Space::new(*sb, (su.x, ob.y, su.z).into()),
+        Space::new((sb.x, ou.y, sb.z).into(), *su),
+        Space::new(*sb, (su.x, su.y, ob.z).into()),
+        Space::new((sb.x, sb.y, ou.z).into(), *su),
+    ]
+    .iter()
+    .filter(|ns| ns.width().min(ns.depth()).min(ns.height()) != 0 && new_space_filter(ns))
+    .cloned()
+    .collect()
 }
 
 #[cfg(test)]

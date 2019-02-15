@@ -1,3 +1,6 @@
+static/worker.*
+build
+
 /target
 **/*.rs.bk
 
