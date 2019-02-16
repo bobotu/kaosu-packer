@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use rand::prelude::*;
 use stdweb::web;
 use stdweb::Value;
 
@@ -43,6 +44,7 @@ impl ThreeRender {
                 canvas: canvas,
                 antialias: true,
             });
+            webGLRenderer.setClearColor(0xffffff, 1.0);
             webGLRenderer.setSize(canvas.width, canvas.height);
             webGLRenderer.shadowMap.enabled = true;
             return webGLRenderer;
@@ -85,7 +87,11 @@ impl ThreeRender {
         let item = js! {
             let scene = @{self.scene.as_ref()};
             let geo = new THREE.BoxGeometry(@{rect.width()}, @{rect.height()}, @{rect.depth()});
-            let mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+            let mat = new THREE.MeshBasicMaterial({
+                color: @{self.rand_color()},
+                transparent: true,
+                opacity: 0.8,
+            });
 
             let item = new THREE.Mesh(geo, mat);
             item.position.x = @{x};
@@ -96,6 +102,22 @@ impl ThreeRender {
             return item;
         };
         self.items.borrow_mut().push(item);
+
+        let edges = js! {
+            let scene = @{self.scene.as_ref()};
+            let item = new THREE.BoxGeometry(@{rect.width()}, @{rect.height()}, @{rect.depth()});
+            let geo = new THREE.EdgesGeometry(item);
+            let mat = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+            let edges = new THREE.LineSegments(geo, mat);
+            edges.position.x = @{x};
+            edges.position.y = @{y};
+            edges.position.z = @{z};
+            scene.add(edges);
+
+            return edges;
+        };
+        self.items.borrow_mut().push(edges);
     }
 
     pub fn clear(&self) {
@@ -110,6 +132,14 @@ impl ThreeRender {
             }
         }
         self.items.borrow_mut().clear();
+    }
+
+    fn rand_color(&self) -> u32 {
+        let mut rng = thread_rng();
+        let r = rng.gen_range(0, 256);
+        let g = rng.gen_range(0, 256);
+        let b = rng.gen_range(0, 256);
+        r << 16 | g << 8 | b
     }
 
     fn setup(&self) {
@@ -163,7 +193,10 @@ impl ThreeRender {
         js! { @(no_return)
             let scene = @{self.scene.as_ref()};
             let geo = new THREE.BoxGeometry(@{width}, @{height}, @{depth});
-            let mat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+            let mat = new THREE.MeshBasicMaterial({
+                color: 0x7f7f7f,
+                wireframe: true,
+            });
 
             let bin = new THREE.Mesh(geo, mat);
             bin.position.x = @{x};
