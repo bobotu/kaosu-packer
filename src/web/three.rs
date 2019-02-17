@@ -52,9 +52,9 @@ impl ThreeRender {
         let camera = js! {
             let canvas = @{canvas.as_ref()};
             let camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 1000);
-            camera.position.x = @{bin_spec.width} * 2.5;
-            camera.position.y = @{bin_spec.height} * 2.5;
-            camera.position.z = @{bin_spec.depth} * 2.5;
+            camera.position.x = @{bin_spec.width} * 1.5;
+            camera.position.y = @{bin_spec.height} * 1.5;
+            camera.position.z = @{bin_spec.depth} * 1.5;
             camera.lookAt(new THREE.Vector3(0, 0, 0));
             @{scene.as_ref()}.add(camera);
             return camera;
@@ -83,7 +83,11 @@ impl ThreeRender {
     }
 
     pub fn add_item(&self, rect: &Space) {
-        let (x, y, z) = rect.center();
+        let (mut x, mut y, mut z) = rect.center();
+        x -= f64::from(self.bin_spec.width) * 0.5;
+        y -= f64::from(self.bin_spec.height) * 0.5;
+        z -= f64::from(self.bin_spec.depth) * 0.5;
+
         let item = js! {
             let scene = @{self.scene.as_ref()};
             let geo = new THREE.BoxGeometry(@{rect.width()}, @{rect.height()}, @{rect.depth()});
@@ -186,9 +190,6 @@ impl ThreeRender {
         let width = self.bin_spec.width;
         let height = self.bin_spec.height;
         let depth = self.bin_spec.depth;
-        let x = f64::from(width) / 2.;
-        let y = f64::from(height) / 2.;
-        let z = f64::from(depth) / 2.;
 
         js! { @(no_return)
             let scene = @{self.scene.as_ref()};
@@ -199,9 +200,6 @@ impl ThreeRender {
             });
 
             let bin = new THREE.Mesh(geo, mat);
-            bin.position.x = @{x};
-            bin.position.y = @{y};
-            bin.position.z = @{z};
             scene.add(bin);
         }
     }
