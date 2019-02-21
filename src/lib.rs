@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-mod ga;
 pub mod geom;
+
+mod ga;
 mod placer;
 
+#[cfg(feature = "serde")]
 use serde::*;
 
 use self::ga::{RandGenerator, Solver};
 use self::geom::{Cuboid, RotationType, Space};
 use self::placer::Decoder;
 
-#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Params {
     pub population_factor: usize,
     pub elites_percentage: f64,
@@ -65,7 +68,8 @@ impl Params {
     }
 }
 
-#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Placement {
     pub space: Space,
     pub item_idx: usize,

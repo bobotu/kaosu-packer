@@ -12,4 +12,8 @@ csv = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 quick-error = "1.2"
 rand = { version = "0.6", features = ["stdweb"]}
-kaosu-packer = { path = "../." }
+
+[dependencies.kaosu-packer]
+path = "../."
+default-features = false
+features = ["serde"]

@@ -15,6 +15,8 @@
  */
 
 use rand::prelude::*;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 pub type Chromosome = Vec<f32>;
 
@@ -28,14 +30,14 @@ pub struct Params {
     pub max_generations_no_improvement: i32,
 }
 
-pub trait Decoder {
-    type Solution: Clone;
+pub trait Decoder: Send + Sync {
+    type Solution: Clone + Send + Sync;
 
     fn decode_chromosome(&self, individual: &Chromosome) -> Self::Solution;
     fn fitness_of(&self, solution: &Self::Solution) -> f64;
 }
 
-pub trait Generator {
+pub trait Generator: Send + Sync {
     fn generate_individual(&self) -> Chromosome;
 }
 
@@ -117,18 +119,20 @@ where
         new_population
     }
 
+    #[inline]
     fn fill_elites(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
         for elite in &self.population[0..self.params.num_elites] {
             new_population.push(elite.clone());
         }
     }
 
+    #[inline]
     fn fill_mutants(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        for _ in 0..self.params.num_mutants {
-            new_population.push(self.random_individual());
-        }
+        self.fill_random_individuals(new_population, self.params.num_mutants);
     }
 
+    #[inline]
+    #[cfg(not(feature = "rayon"))]
     fn fill_offsprings(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
         let params = &self.params;
         let num_offsprings = params.population_size - params.num_elites - params.num_mutants;
@@ -140,6 +144,24 @@ where
         }
     }
 
+    #[inline]
+    #[cfg(feature = "rayon")]
+    fn fill_offsprings(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
+        let params = &self.params;
+        let num_offsprings = params.population_size - params.num_elites - params.num_mutants;
+
+        let mut offsprings = Vec::with_capacity(num_offsprings);
+        (0..num_offsprings)
+            .into_par_iter()
+            .map(|_| {
+                let (elite, non_elite) = self.pickup_parents_for_crossover();
+                self.crossover(elite, non_elite)
+            })
+            .collect_into_vec(&mut offsprings);
+        new_population.append(&mut offsprings);
+    }
+
+    #[inline]
     fn crossover(
         &self,
         elite: &Chromosome,
@@ -159,6 +181,7 @@ where
         self.evaluate_chromosome(offspring)
     }
 
+    #[inline]
     fn pickup_parents_for_crossover(&self) -> (&Chromosome, &Chromosome) {
         let mut rng = thread_rng();
         let elite_size = self.params.num_elites;
@@ -167,6 +190,33 @@ where
         let non_elite = &self.population[elite_size + rng.gen_range(0, non_elite_size)];
 
         (&elite.chromosome, &non_elite.chromosome)
+    }
+
+    #[inline]
+    #[cfg(not(feature = "rayon"))]
+    fn fill_random_individuals(
+        &self,
+        new_population: &mut Vec<InnerChromosome<D::Solution>>,
+        size: usize,
+    ) {
+        for _ in 0..size {
+            new_population.push(self.random_individual());
+        }
+    }
+
+    #[inline]
+    #[cfg(feature = "rayon")]
+    fn fill_random_individuals(
+        &self,
+        new_population: &mut Vec<InnerChromosome<D::Solution>>,
+        size: usize,
+    ) {
+        let mut buf = Vec::with_capacity(size);
+        (0..size)
+            .into_par_iter()
+            .map(|_| self.random_individual())
+            .collect_into_vec(&mut buf);
+        new_population.append(&mut buf);
     }
 
     fn random_individual(&self) -> InnerChromosome<D::Solution> {
@@ -185,9 +235,8 @@ where
     }
 
     fn init_population(&mut self) {
-        let mut population = (0..self.params.population_size)
-            .map(|_| self.random_individual())
-            .collect();
+        let mut population = Vec::with_capacity(self.params.population_size);
+        self.fill_random_individuals(&mut population, self.params.population_size);
         Self::sort_population(&mut population);
         self.population = population;
     }

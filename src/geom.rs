@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(feature = "serde")]
 use serde::*;
 
-#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point {
     pub x: i32,
     pub y: i32,
@@ -40,14 +42,16 @@ impl Point {
     }
 }
 
-#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cuboid {
     pub width: i32,
     pub depth: i32,
     pub height: i32,
 }
 
-#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum RotationType {
     ThreeDimension,
     TwoDimension,
@@ -110,7 +114,8 @@ impl Into<Cuboid> for &Cuboid {
     }
 }
 
-#[derive(PartialEq, Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Space {
     pub bottom_left: Point,
     pub upper_right: Point,
