@@ -18,7 +18,8 @@ use std::result::Result as StdResult;
 
 use serde::*;
 
-use crate::packer::*;
+use kaosu_packer::geom::Cuboid;
+use kaosu_packer::Params;
 
 quick_error! {
     #[derive(Debug)]
@@ -55,33 +56,27 @@ pub struct Item {
     pub group: usize,
 }
 
-impl Into<Dimension> for &Item {
-    fn into(self) -> Dimension {
-        Dimension::new(self.width, self.depth, self.height)
+impl Into<Cuboid> for &Item {
+    fn into(self) -> Cuboid {
+        Cuboid::new(self.width, self.depth, self.height)
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct DataSpec {
+#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
+pub struct ProblemSpec {
     pub params: Params,
-    pub bin_spec: Dimension,
+    pub bin: Cuboid,
     pub items: Vec<Item>,
 }
 
-impl DataSpec {
-    pub fn new(params: Params, bin_spec: Dimension, items: Vec<Item>) -> Result<Self> {
-        if items.is_empty() {
+impl ProblemSpec {
+    pub fn validate(&self) -> Result<()> {
+        if self.items.is_empty() {
             return Err(Error::NoBoxToBePack);
         }
-        if bin_spec.height <= 0 || bin_spec.depth <= 0 || bin_spec.width <= 0 {
+        if self.bin.height <= 0 || self.bin.depth <= 0 || self.bin.width <= 0 {
             return Err(Error::InvalidBinSpec);
         }
-        Ok(DataSpec {
-            params,
-            bin_spec,
-            items,
-        })
+        Ok(())
     }
 }
-
-pub type Solution = Vec<Vec<Placement<Item>>>;

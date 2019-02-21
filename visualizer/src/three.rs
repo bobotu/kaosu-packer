@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+use std::cell::RefCell;
+
 use rand::prelude::*;
 use stdweb::web;
 use stdweb::Value;
 
-use crate::{Dimension, Space};
-use std::cell::RefCell;
+use kaosu_packer::geom::{Cuboid, Space};
 
 #[derive(Clone)]
 pub struct ThreeRender {
@@ -29,11 +30,11 @@ pub struct ThreeRender {
     camera: Value,
     control: Value,
     items: RefCell<Vec<Value>>,
-    bin_spec: Dimension,
+    bin_spec: Cuboid,
 }
 
 impl ThreeRender {
-    pub fn new(canvas: web::Element, bin_spec: Dimension) -> Self {
+    pub fn new(canvas: web::Element, bin_spec: Cuboid) -> Self {
         let canvas = canvas.clone();
         let scene = js! {
             return new THREE.Scene()

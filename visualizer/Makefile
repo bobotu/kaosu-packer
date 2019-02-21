@@ -1,4 +1,4 @@
-CARGO_TARGET_DIR := $(CURDIR)/target/wasm32-unknown-unknown
+CARGO_TARGET_DIR := $(CURDIR)/../target/wasm32-unknown-unknown
 STATIC_DIR := $(CURDIR)/static
 RELEASE_DIR := ${CARGO_TARGET_DIR}/release
 DEBUG_DIR := ${CARGO_TARGET_DIR}/debug
@@ -9,8 +9,8 @@ default: deploy
 deploy:
 	@cargo web build --release
 	@rm -rf ${DEPLOY_DIR} && mkdir ${DEPLOY_DIR}
-	@cp ${RELEASE_DIR}/worker.wasm ${DEPLOY_DIR}
-	@cp ${RELEASE_DIR}/worker.js ${DEPLOY_DIR}
+	@cp ${RELEASE_DIR}/packer.wasm ${DEPLOY_DIR}
+	@cp ${RELEASE_DIR}/packer.js ${DEPLOY_DIR}
 	@cp ${RELEASE_DIR}/app.wasm ${DEPLOY_DIR}
 	@cp ${RELEASE_DIR}/app.js ${DEPLOY_DIR}
 	@cp ${RELEASE_DIR}/worker.wasm ${DEPLOY_DIR}
@@ -19,9 +19,9 @@ deploy:
 	@cp ${STATIC_DIR}/TrackballControls.js ${DEPLOY_DIR}
 
 dev:
-	@cargo web build --bin worker
-	@cp ${DEBUG_DIR}/worker.wasm ${STATIC_DIR}
-	@cp ${DEBUG_DIR}/worker.js ${STATIC_DIR}
+	@cargo web build --bin packer
+	@cp ${DEBUG_DIR}/packer.wasm ${STATIC_DIR}
+	@cp ${DEBUG_DIR}/packer.js ${STATIC_DIR}
 	@cargo web start --bin app
 
 clean:

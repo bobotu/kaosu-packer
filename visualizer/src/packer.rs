@@ -17,55 +17,49 @@
 use serde::*;
 use yew::prelude::worker::*;
 
-use crate::packer::pack_boxes;
+use super::types::*;
+use kaosu_packer::{pack_boxes, PackSolution};
 
-use super::inner::*;
-
-pub struct Worker {
-    link: AgentLink<Worker>,
+pub struct Packer {
+    link: AgentLink<Packer>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Request(DataSpec);
-
-impl From<DataSpec> for Request {
-    fn from(spec: DataSpec) -> Self {
-        Request(spec)
-    }
+pub enum Request {
+    Problem(ProblemSpec),
 }
 
 impl Transferable for Request {}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Response(Solution);
-
-impl Into<Solution> for Response {
-    fn into(self) -> Solution {
-        self.0
-    }
+pub enum Response {
+    Solution(PackSolution),
 }
 
 impl Transferable for Response {}
 
-impl Agent for Worker {
+impl Agent for Packer {
     type Reach = Public;
     type Message = ();
     type Input = Request;
     type Output = Response;
 
     fn create(link: AgentLink<Self>) -> Self {
-        Worker { link }
+        Packer { link }
     }
 
     fn update(&mut self, _: Self::Message) {}
 
     fn handle(&mut self, msg: Self::Input, who: HandlerId) {
-        let input = msg.0;
-        let result = pack_boxes(input.params, input.bin_spec, &input.items);
-        self.link.response(who, Response(result));
+        match msg {
+            Request::Problem(input) => {
+                let result = pack_boxes(input.params, input.bin, &input.items);
+                self.link.response(who, Response::Solution(result));
+            }
+        }
     }
 
     fn name_of_resource() -> &'static str {
-        "worker.js"
+        "packer.js"
     }
 }

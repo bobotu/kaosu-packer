@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::iter;
+use std::rc::Rc;
 use std::str::FromStr;
 
-use super::inner::Error::*;
-use super::inner::*;
-use crate::packer::*;
 use serde::*;
 use stdweb::{unstable::*, web::*};
 use yew::prelude::*;
 
+use super::types::{Error::*, *};
+use kaosu_packer::geom::{Cuboid, RotationType};
+use kaosu_packer::Params;
+
 #[derive(PartialEq, Clone, Default)]
 pub struct Props {
-    pub onsubmit: Option<Callback<DataSpec>>,
+    pub onsubmit: Option<Callback<Rc<RefCell<ProblemSpec>>>>,
 }
 
 pub enum Msg {
@@ -47,12 +50,10 @@ pub enum Msg {
 }
 
 pub struct InputProcess {
-    params: Params,
-    bin_spec: Dimension,
-    items: Vec<Item>,
+    problem_spec: Rc<RefCell<ProblemSpec>>,
     file_name: String,
     link: ComponentLink<Self>,
-    onsubmit: Option<Callback<DataSpec>>,
+    onsubmit: Callback<Rc<RefCell<ProblemSpec>>>,
 }
 
 impl Component for InputProcess {
@@ -61,11 +62,13 @@ impl Component for InputProcess {
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
         InputProcess {
-            params: Params::default(),
-            bin_spec: Dimension::new(0, 0, 0),
-            items: Vec::new(),
+            problem_spec: Rc::new(RefCell::new(ProblemSpec {
+                params: Params::default(),
+                bin: Cuboid::new(0, 0, 0),
+                items: Vec::new(),
+            })),
             file_name: String::new(),
-            onsubmit: props.onsubmit,
+            onsubmit: props.onsubmit.unwrap(),
             link,
         }
     }
@@ -86,7 +89,7 @@ impl InputProcess {
         match msg {
             Msg::ItemsLoaded(result) => {
                 let (items, name) = result?;
-                self.items = items;
+                self.problem_spec.borrow_mut().items = items;
                 self.file_name = name;
                 Ok(true)
             }
@@ -95,56 +98,63 @@ impl InputProcess {
                 Ok(false)
             }
             Msg::UpdateBinWidth(s) => {
-                self.bin_spec.width = parse_number(s)?;
+                let bin_spec = &mut self.problem_spec.borrow_mut().bin;
+                bin_spec.width = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateBinDepth(s) => {
-                self.bin_spec.depth = parse_number(s)?;
+                let bin_spec = &mut self.problem_spec.borrow_mut().bin;
+                bin_spec.depth = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateBinHeight(s) => {
-                self.bin_spec.height = parse_number(s)?;
+                let bin_spec = &mut self.problem_spec.borrow_mut().bin;
+                bin_spec.height = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdatePopFactor(s) => {
-                self.params.population_factor = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.population_factor = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateElitesPer(s) => {
-                self.params.elites_percentage = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.elites_percentage = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateMutantsPer(s) => {
-                self.params.max_generations = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.max_generations = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateProb(s) => {
-                self.params.inherit_elite_probability = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.inherit_elite_probability = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateMaxGen(s) => {
-                self.params.max_generations = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.max_generations = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateMaxGenNoImprove(s) => {
-                self.params.max_generations_no_improvement = parse_number(s)?;
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.max_generations_no_improvement = parse_number(s)?;
                 Ok(false)
             }
             Msg::UpdateRotation => {
-                self.params.box_rotation_type = match self.params.box_rotation_type {
+                let params = &mut self.problem_spec.borrow_mut().params;
+                params.box_rotation_type = match params.box_rotation_type {
                     RotationType::ThreeDimension => RotationType::TwoDimension,
                     RotationType::TwoDimension => RotationType::ThreeDimension,
                 };
                 Ok(false)
             }
-            Msg::Submit => match &mut self.onsubmit {
-                Some(callback) => {
-                    let spec = DataSpec::new(self.params, self.bin_spec, self.items.clone())?;
-                    callback.emit(spec);
-                    Ok(false)
-                }
-                _ => Ok(false),
-            },
+            Msg::Submit => {
+                self.problem_spec.borrow().validate()?;
+                self.onsubmit.emit(self.problem_spec.clone());
+                Ok(false)
+            }
         }
     }
 
@@ -300,7 +310,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="population-size",>{"Population Factor"}</label>
                     <input id="population-size",
-                           value=self.params.population_factor,
+                           value=self.problem_spec.borrow().params.population_factor,
                            onchange=|s| Msg::UpdatePopFactor(s),
                            type="number", min="1",
                            required="",/>
@@ -308,7 +318,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="num-elites",>{"Elites Percentage"}</label>
                     <input id="num-elites",
-                           value=self.params.elites_percentage,
+                           value=self.problem_spec.borrow().params.elites_percentage,
                            onchange=|s| Msg::UpdateElitesPer(s),
                            type="number", min="0", step="any",
                            required="",/>
@@ -316,7 +326,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="num-mutants",>{"Mutants Percentage"}</label>
                     <input id="num-mutants",
-                           value=self.params.mutants_percentage,
+                           value=self.problem_spec.borrow().params.mutants_percentage,
                            onchange=|s| Msg::UpdateMutantsPer(s),
                            type="number", min="0", step="any",
                            required="",/>
@@ -328,7 +338,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="inherit-probability",>{"Inherit Probability"}</label>
                     <input id="inherit-probability",
-                           value=self.params.inherit_elite_probability,
+                           value=self.problem_spec.borrow().params.inherit_elite_probability,
                            onchange=|s| Msg::UpdateProb(s),
                            type="number", min="0", step="any",
                            required="",/>
@@ -336,7 +346,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="max-gen",>{"Max Generations"}</label>
                     <input id="max-gen",
-                           value=self.params.max_generations,
+                           value=self.problem_spec.borrow().params.max_generations,
                            onchange=|s| Msg::UpdateMaxGen(s),
                            type="number", min="0",
                            required="",/>
@@ -344,7 +354,7 @@ impl InputProcess {
                 <div class="pure-u-1-3",>
                     <label for="max-gen-no-improve",>{"Max No Improvement"}</label>
                     <input id="max-gen-no-improve",
-                           value=self.params.max_generations_no_improvement,
+                           value=self.problem_spec.borrow().params.max_generations_no_improvement,
                            onchange=|s| Msg::UpdateMaxGenNoImprove(s),
                            type="number", min="0",
                            required="",/>
@@ -376,7 +386,7 @@ impl InputProcess {
     }
 
     fn is_rotate_3d(&self) -> bool {
-        match self.params.box_rotation_type {
+        match self.problem_spec.borrow().params.box_rotation_type {
             RotationType::ThreeDimension => true,
             _ => false,
         }

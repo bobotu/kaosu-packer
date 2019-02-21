@@ -1,13 +1,15 @@
 [package]
-name = "kaosu-packer"
+name = "visualizer"
 description = "あばばばばばばばばば"
 version = "0.1.0"
 authors = ["Zejun Li <me@zejun.li>"]
 edition = "2018"
 
 [dependencies]
+yew = "0.5.0"
+stdweb = "0.4"
+csv = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-rand = "0.6"
-
-[workspace]
-members = ["visualizer"]
+quick-error = "1.2"
+rand = { version = "0.6", features = ["stdweb"]}
+kaosu-packer = { path = "../." }

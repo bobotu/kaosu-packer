@@ -14,22 +14,56 @@
  * limitations under the License.
  */
 
-use super::ga::Chromosome;
-use super::geometry::*;
-use super::inner::*;
+use super::ga::{Chromosome, Decoder as GADecoder};
+use super::geom::*;
 
-pub struct Placer<'a, 'b> {
+pub struct Decoder {
+    boxes: Vec<InnerBox>,
+    bin_spec: Cuboid,
+    bin_volume: i32,
+    rotation_type: RotationType,
+}
+
+impl Decoder {
+    pub fn new<'a, T: 'a>(boxes: &'a [T], bin_spec: Cuboid, rotation_type: RotationType) -> Self
+    where
+        &'a T: Into<Cuboid>,
+    {
+        let boxes = boxes.iter().map(|b| b.into().into()).collect();
+        let bin_volume = bin_spec.volume();
+        Decoder {
+            boxes,
+            bin_spec,
+            bin_volume,
+            rotation_type,
+        }
+    }
+}
+
+impl GADecoder for Decoder {
+    type Solution = InnerSolution;
+
+    fn decode_chromosome(&self, individual: &Chromosome) -> Self::Solution {
+        Placer::new(individual, &self.boxes, &self.bin_spec, self.rotation_type).place_boxes()
+    }
+
+    fn fitness_of(&self, solution: &Self::Solution) -> f64 {
+        solution.num_bins as f64 + (f64::from(solution.least_load) / f64::from(self.bin_volume))
+    }
+}
+
+struct Placer<'a, 'b> {
     chromosome: &'a Chromosome,
-    bin_spec: &'b Rectangle,
+    bin_spec: &'b Cuboid,
     boxes: &'b [InnerBox],
     rotation_type: RotationType,
 }
 
 impl<'a, 'b> Placer<'a, 'b> {
-    pub fn new(
+    fn new(
         chromosome: &'a Chromosome,
         boxes: &'b [InnerBox],
-        bin_spec: &'b Rectangle,
+        bin_spec: &'b Cuboid,
         rotation_type: RotationType,
     ) -> Self {
         Placer {
@@ -40,9 +74,9 @@ impl<'a, 'b> Placer<'a, 'b> {
         }
     }
 
-    pub fn place_boxes(&self) -> InnerSolution {
+    fn place_boxes(&self) -> InnerSolution {
         let mut placements = Vec::with_capacity(self.boxes.len());
-        let mut bins: Vec<(Bin, i32)> = Vec::new();
+        let mut bins: Vec<(InnerBin, i32)> = Vec::new();
         let bps = self.calculate_bps();
 
         for (bps_idx, &(box_idx, _)) in bps.iter().enumerate() {
@@ -61,7 +95,7 @@ impl<'a, 'b> Placer<'a, 'b> {
             }
 
             if fit_bin.is_none() {
-                bins.push((Bin::new(*self.bin_spec), 0));
+                bins.push((InnerBin::new(*self.bin_spec), 0));
                 fit_bin = Some(bins.len() - 1);
                 fit_space = Some(&bins[fit_bin.unwrap()].0.empty_space_list[0]);
             }
@@ -88,8 +122,9 @@ impl<'a, 'b> Placer<'a, 'b> {
     fn placement_of_box(&self, box_idx: usize, container: &Space) -> Space {
         let rect = &self.boxes[box_idx].rect;
         let gene = self.vbo(box_idx);
-        let orientations = rect
-            .orientations(self.rotation_type)
+        let orientations = self
+            .rotation_type
+            .orientations_for(rect)
             .into_iter()
             .filter(|rect| rect.can_fit_in(container))
             .collect::<Vec<_>>();
@@ -125,15 +160,15 @@ impl<'a, 'b> Placer<'a, 'b> {
     }
 }
 
-struct Bin {
-    spec: Rectangle,
+struct InnerBin {
+    spec: Cuboid,
     empty_space_list: Vec<Space>,
 }
 
-impl Bin {
-    fn new(spec: Rectangle) -> Self {
-        let empty_space_list = vec![Space::from_placement(&(0, 0, 0).into(), &spec)];
-        Bin {
+impl InnerBin {
+    fn new(spec: Cuboid) -> Self {
+        let empty_space_list = vec![Space::from_placement(&Point::new(0, 0, 0), &spec)];
+        InnerBin {
             spec,
             empty_space_list,
         }
@@ -141,19 +176,19 @@ impl Bin {
 
     fn find_best_space_for_box(
         &self,
-        rect: &Rectangle,
+        rect: &Cuboid,
         rotation_type: RotationType,
     ) -> Option<&Space> {
         let mut max_dist = -1;
         let mut best_ems = None;
 
-        let orientations = rect.orientations(rotation_type);
+        let orientations = rotation_type.orientations_for(rect);
         let container_upper_right = Point::new(self.spec.width, self.spec.depth, self.spec.height);
 
         for ems in &self.empty_space_list {
             for o in orientations.iter().filter(|o| o.can_fit_in(ems)) {
                 let box_upper_right = Space::from_placement(ems.origin(), o).upper_right;
-                let dist = container_upper_right.distance_between(&box_upper_right);
+                let dist = container_upper_right.distance2_from(&box_upper_right);
                 if dist > max_dist {
                     max_dist = dist;
                     best_ems = Some(ems);
@@ -199,4 +234,85 @@ impl Bin {
             }
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct InnerPlacement {
+    pub space: Space,
+    pub bin_no: usize,
+    pub box_idx: usize,
+}
+
+impl InnerPlacement {
+    fn new(space: Space, bin_no: usize, box_idx: usize) -> Self {
+        InnerPlacement {
+            space,
+            bin_no,
+            box_idx,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct InnerBox {
+    pub rect: Cuboid,
+    pub smallest_dimension: i32,
+    pub volume: i32,
+}
+
+impl<T> From<T> for InnerBox
+where
+    T: Into<Cuboid>,
+{
+    fn from(raw: T) -> Self {
+        let rect = raw.into();
+        let smallest_dimension = rect.height.min(rect.width).min(rect.depth);
+        let volume = rect.volume();
+        InnerBox {
+            rect,
+            smallest_dimension,
+            volume,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct InnerSolution {
+    pub num_bins: usize,
+    pub least_load: i32,
+    pub placements: Vec<InnerPlacement>,
+}
+
+impl InnerSolution {
+    fn new(num_bins: usize, least_load: i32, placements: Vec<InnerPlacement>) -> Self {
+        InnerSolution {
+            num_bins,
+            least_load,
+            placements,
+        }
+    }
+}
+
+fn difference_process<F>(this: &Space, other: &Space, mut new_space_filter: F) -> Vec<Space>
+where
+    F: FnMut(&Space) -> bool,
+{
+    let (sb, su, ob, ou) = (
+        &this.bottom_left,
+        &this.upper_right,
+        &other.bottom_left,
+        &other.upper_right,
+    );
+    [
+        Space::new(*sb, Point::new(ob.x, su.y, su.z)),
+        Space::new(Point::new(ou.x, sb.y, sb.z), *su),
+        Space::new(*sb, Point::new(su.x, ob.y, su.z)),
+        Space::new(Point::new(sb.x, ou.y, sb.z), *su),
+        Space::new(*sb, Point::new(su.x, su.y, ob.z)),
+        Space::new(Point::new(sb.x, sb.y, ou.z), *su),
+    ]
+    .iter()
+    .filter(|ns| ns.width().min(ns.depth()).min(ns.height()) != 0 && new_space_filter(ns))
+    .cloned()
+    .collect()
 }

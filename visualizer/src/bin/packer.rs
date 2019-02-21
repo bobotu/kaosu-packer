@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-use kaosu_packer::web;
 use yew::prelude::*;
 
 fn main() {
     yew::initialize();
-    web::Worker::register();
+    visualizer::Packer::register();
     yew::run_loop();
 }

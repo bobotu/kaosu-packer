@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-use kaosu_packer::web;
 use yew::prelude::*;
 
 fn main() {
     yew::initialize();
-    App::<web::App>::new().mount_to_body();
+    App::<visualizer::App>::new().mount_to_body();
     yew::run_loop();
 }

@@ -1,5 +1,5 @@
-static/worker.*
-build
+visualizer/static/packer.*
+visualizer/build
 
 /target
 **/*.rs.bk
