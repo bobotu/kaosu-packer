@@ -77,22 +77,39 @@ pub struct Placement {
 
 pub type PackSolution = Vec<Vec<Placement>>;
 
+macro_rules! do_pack {
+    ($params:ident, $bin_spec:ident, $boxes:ident) => {{
+        let generator = RandGenerator::new($boxes.len() * 2);
+        let ga_params = $params.get_ga_params($boxes.len());
+        let mut solver = Solver::new(ga_params, generator, || {
+            Decoder::new($boxes, $bin_spec, $params.box_rotation_type)
+        });
+        let solution = solver.solve();
+
+        let mut bins = vec![Vec::new(); solution.num_bins];
+        for inner_placement in &solution.placements {
+            let idx = inner_placement.bin_no;
+            let space = inner_placement.space;
+            let item_idx = inner_placement.box_idx;
+            bins[idx].push(Placement { space, item_idx })
+        }
+        bins
+    }};
+}
+
+#[cfg(feature = "rayon")]
+pub fn pack_boxes<'a, T>(params: Params, bin_spec: Cuboid, boxes: &'a [T]) -> PackSolution
+where
+    T: Sync,
+    &'a T: Into<Cuboid>,
+{
+    do_pack!(params, bin_spec, boxes)
+}
+
+#[cfg(not(feature = "rayon"))]
 pub fn pack_boxes<'a, T>(params: Params, bin_spec: Cuboid, boxes: &'a [T]) -> PackSolution
 where
     &'a T: Into<Cuboid>,
 {
-    let decoder = Decoder::new(boxes, bin_spec, params.box_rotation_type);
-    let generator = RandGenerator::new(boxes.len() * 2);
-    let ga_params = params.get_ga_params(boxes.len());
-    let mut solver = Solver::new(ga_params, generator, decoder);
-    let solution = solver.solve();
-
-    let mut bins = vec![Vec::new(); solution.num_bins];
-    for inner_placement in &solution.placements {
-        let idx = inner_placement.bin_no;
-        let space = inner_placement.space;
-        let item_idx = inner_placement.box_idx;
-        bins[idx].push(Placement { space, item_idx })
-    }
-    bins
+    do_pack!(params, bin_spec, boxes)
 }

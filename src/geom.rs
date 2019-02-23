@@ -57,39 +57,6 @@ pub enum RotationType {
     TwoDimension,
 }
 
-impl RotationType {
-    pub fn orientations_for(self, rect: &Cuboid) -> Vec<Cuboid> {
-        let only_2d = match self {
-            RotationType::TwoDimension => true,
-            RotationType::ThreeDimension => false,
-        };
-        let mut result = Vec::with_capacity(if only_2d { 2 } else { 6 });
-
-        result.push(Cuboid::new(rect.width, rect.depth, rect.height));
-        if rect.width != rect.depth {
-            result.push(Cuboid::new(rect.depth, rect.width, rect.height));
-        }
-
-        if !only_2d {
-            if rect.height != rect.depth {
-                result.push(Cuboid::new(rect.width, rect.height, rect.depth));
-                if rect.height != rect.width {
-                    result.push(Cuboid::new(rect.height, rect.width, rect.depth))
-                }
-            }
-
-            if rect.width != rect.depth && rect.height != rect.width {
-                result.push(Cuboid::new(rect.height, rect.depth, rect.width));
-                if rect.height != rect.depth {
-                    result.push(Cuboid::new(rect.depth, rect.height, rect.width));
-                }
-            }
-        }
-
-        result
-    }
-}
-
 impl Cuboid {
     pub fn new(width: i32, depth: i32, height: i32) -> Self {
         Cuboid {
@@ -182,5 +149,9 @@ impl Space {
         let uz = self.upper_right.z.min(other.upper_right.z);
 
         Space::new(Point::new(bx, by, bz), Point::new(ux, uy, uz))
+    }
+
+    pub fn volume(&self) -> i32 {
+        self.width() * self.height() * self.depth()
     }
 }

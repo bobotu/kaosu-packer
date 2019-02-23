@@ -14,11 +14,20 @@
  * limitations under the License.
  */
 
+use std::mem;
+
 use rand::prelude::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
 pub type Chromosome = Vec<f32>;
+
+#[derive(Clone)]
+struct InnerChromosome<S: Clone> {
+    chromosome: Chromosome,
+    solution: S,
+    fitness: f64,
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Params {
@@ -30,14 +39,25 @@ pub struct Params {
     pub max_generations_no_improvement: i32,
 }
 
-pub trait Decoder: Send + Sync {
-    type Solution: Clone + Send + Sync;
+pub trait Decoder {
+    #[cfg(not(feature = "rayon"))]
+    type Solution: Clone;
 
-    fn decode_chromosome(&self, individual: &Chromosome) -> Self::Solution;
+    #[cfg(feature = "rayon")]
+    type Solution: Clone + Sync + Send;
+
+    fn decode_chromosome(&mut self, individual: &Chromosome) -> Self::Solution;
     fn fitness_of(&self, solution: &Self::Solution) -> f64;
+    fn reset(&mut self);
 }
 
-pub trait Generator: Send + Sync {
+#[cfg(feature = "rayon")]
+pub trait Generator: Sync + Send {
+    fn generate_individual(&self) -> Chromosome;
+}
+
+#[cfg(not(feature = "rayon"))]
+pub trait Generator {
     fn generate_individual(&self) -> Chromosome;
 }
 
@@ -59,131 +79,87 @@ impl Generator for RandGenerator {
     }
 }
 
-pub struct Solver<G, D>
+pub struct Solver<G, D, F>
 where
     G: Generator,
     D: Decoder,
+    F: Fn() -> D,
 {
     generator: G,
-    decoder: D,
+    decoder_factory: F,
     params: Params,
+
+    // reuse population vec between generations.
     population: Vec<InnerChromosome<D::Solution>>,
+    population1: Vec<InnerChromosome<D::Solution>>,
 }
 
-impl<G, D> Solver<G, D>
+macro_rules! define_solve_and_new {
+    () => {
+        pub fn new(params: Params, generator: G, decoder_factory: F) -> Solver<G, D, F> {
+            Solver {
+                generator,
+                decoder_factory,
+                params,
+                population: Vec::with_capacity(params.population_size),
+                population1: Vec::with_capacity(params.population_size),
+            }
+        }
+
+        pub fn solve(&mut self) -> D::Solution {
+            let mut generation = 0;
+            let mut generations_no_improvement = 0;
+
+            self.init_first_generation();
+
+            while generation < self.params.max_generations
+                && generations_no_improvement < self.params.max_generations_no_improvement
+            {
+                let prev_fitness = self.population[0].fitness;
+                self.evolve_new_generation();
+                let curr_fitness = self.population[0].fitness;
+
+                if curr_fitness < prev_fitness {
+                    generations_no_improvement = 0;
+                } else {
+                    generations_no_improvement += 1;
+                }
+
+                generation += 1;
+            }
+
+            self.population[0].solution.clone()
+        }
+    };
+}
+
+impl<G, D, F> Solver<G, D, F>
 where
     G: Generator,
     D: Decoder,
+    F: Fn() -> D,
 {
-    pub fn new(params: Params, generator: G, decoder: D) -> Solver<G, D> {
-        Solver {
-            generator,
-            decoder,
-            params,
-            population: Vec::new(),
-        }
-    }
-
-    pub fn solve(&mut self) -> D::Solution {
-        let mut generation = 0;
-        let mut generations_no_improvement = 0;
-
-        self.init_population();
-
-        while generation < self.params.max_generations
-            && generations_no_improvement < self.params.max_generations_no_improvement
-        {
-            let new_population = self.evolve_new_generation();
-
-            if new_population[0].fitness < self.population[0].fitness {
-                generations_no_improvement = 0;
-            } else {
-                generations_no_improvement += 1;
-            }
-
-            self.population = new_population;
-            generation += 1;
-        }
-
-        self.population[0].solution.clone()
-    }
-
-    fn evolve_new_generation(&mut self) -> Vec<InnerChromosome<D::Solution>> {
-        let mut new_population = Vec::with_capacity(self.params.population_size);
-
-        self.fill_elites(&mut new_population);
-        self.fill_mutants(&mut new_population);
-        self.fill_offsprings(&mut new_population);
-        Self::sort_population(&mut new_population);
-
-        new_population
-    }
-
-    #[inline]
-    fn fill_elites(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        for elite in &self.population[0..self.params.num_elites] {
-            new_population.push(elite.clone());
-        }
-    }
-
-    #[inline]
-    fn fill_mutants(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        self.fill_random_individuals(new_population, self.params.num_mutants);
-    }
-
-    #[inline]
-    #[cfg(not(feature = "rayon"))]
-    fn fill_offsprings(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        let params = &self.params;
-        let num_offsprings = params.population_size - params.num_elites - params.num_mutants;
-
-        for _ in 0..num_offsprings {
-            let (elite, non_elite) = self.pickup_parents_for_crossover();
-            let offspring = self.crossover(elite, non_elite);
-            new_population.push(offspring);
-        }
-    }
-
-    #[inline]
-    #[cfg(feature = "rayon")]
-    fn fill_offsprings(&self, new_population: &mut Vec<InnerChromosome<D::Solution>>) {
-        let params = &self.params;
-        let num_offsprings = params.population_size - params.num_elites - params.num_mutants;
-
-        let mut offsprings = Vec::with_capacity(num_offsprings);
-        (0..num_offsprings)
-            .into_par_iter()
-            .map(|_| {
-                let (elite, non_elite) = self.pickup_parents_for_crossover();
-                self.crossover(elite, non_elite)
-            })
-            .collect_into_vec(&mut offsprings);
-        new_population.append(&mut offsprings);
-    }
-
     #[inline]
     fn crossover(
         &self,
         elite: &Chromosome,
         non_elite: &Chromosome,
-    ) -> InnerChromosome<D::Solution> {
-        let mut rng = thread_rng();
+        rng: &mut ThreadRng,
+    ) -> Chromosome {
         let mut offspring = Vec::with_capacity(elite.len());
-        for i in 0..elite.len() {
+        offspring.extend((0..elite.len()).map(|i| {
             let p: f64 = rng.gen();
-            let gen = if p <= self.params.inherit_elite_probability {
+            if p <= self.params.inherit_elite_probability {
                 elite[i]
             } else {
                 non_elite[i]
-            };
-            offspring.push(gen);
-        }
-        self.evaluate_chromosome(offspring)
+            }
+        }));
+        offspring
     }
 
     #[inline]
-    fn pickup_parents_for_crossover(&self) -> (&Chromosome, &Chromosome) {
-        let mut rng = thread_rng();
+    fn pickup_parents_for_crossover(&self, rng: &mut ThreadRng) -> (&Chromosome, &Chromosome) {
         let elite_size = self.params.num_elites;
         let non_elite_size = self.params.population_size - elite_size;
         let elite = &self.population[rng.gen_range(0, elite_size)];
@@ -193,62 +169,136 @@ where
     }
 
     #[inline]
-    #[cfg(not(feature = "rayon"))]
-    fn fill_random_individuals(
-        &self,
-        new_population: &mut Vec<InnerChromosome<D::Solution>>,
-        size: usize,
-    ) {
-        for _ in 0..size {
-            new_population.push(self.random_individual());
-        }
+    fn sort_population(population: &mut Vec<InnerChromosome<D::Solution>>) {
+        population.sort_unstable_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap());
     }
 
     #[inline]
-    #[cfg(feature = "rayon")]
-    fn fill_random_individuals(
-        &self,
-        new_population: &mut Vec<InnerChromosome<D::Solution>>,
-        size: usize,
-    ) {
-        let mut buf = Vec::with_capacity(size);
-        (0..size)
-            .into_par_iter()
-            .map(|_| self.random_individual())
-            .collect_into_vec(&mut buf);
-        new_population.append(&mut buf);
-    }
+    fn decode_chromosome(decoder: &mut D, chromosome: Chromosome) -> InnerChromosome<D::Solution> {
+        let solution = decoder.decode_chromosome(&chromosome);
+        let fitness = decoder.fitness_of(&solution);
+        decoder.reset();
 
-    fn random_individual(&self) -> InnerChromosome<D::Solution> {
-        let chromosome = self.generator.generate_individual();
-        self.evaluate_chromosome(chromosome)
-    }
-
-    fn evaluate_chromosome(&self, chromosome: Chromosome) -> InnerChromosome<D::Solution> {
-        let solution = self.decoder.decode_chromosome(&chromosome);
-        let fitness = self.decoder.fitness_of(&solution);
         InnerChromosome {
             chromosome,
             solution,
             fitness,
         }
     }
+}
 
-    fn init_population(&mut self) {
-        let mut population = Vec::with_capacity(self.params.population_size);
-        self.fill_random_individuals(&mut population, self.params.population_size);
-        Self::sort_population(&mut population);
-        self.population = population;
+#[cfg(feature = "rayon")]
+impl<G, D, F> Solver<G, D, F>
+where
+    G: Generator,
+    D: Decoder,
+    F: Fn() -> D + Sync + Send,
+{
+    define_solve_and_new!();
+
+    fn evolve_new_generation(&mut self) {
+        let num_elites = self.params.num_elites;
+        let num_mutants = self.params.num_mutants;
+        let num_offsprings = self.params.population_size - num_elites - num_mutants;
+
+        let decoder_factory = &self.decoder_factory;
+        let generator = &self.generator;
+        let mut dummy = Vec::new();
+
+        // reuse decoder in mutant and crossover.
+        mem::swap(&mut dummy, &mut self.population1);
+        (0..(num_mutants + num_offsprings))
+            .into_par_iter()
+            .map_init(
+                || (decoder_factory(), thread_rng()),
+                |&mut (ref mut decoder, ref mut rng), i| {
+                    if i < num_mutants {
+                        Self::decode_chromosome(decoder, generator.generate_individual())
+                    } else {
+                        let (elite, non_elite) = self.pickup_parents_for_crossover(rng);
+                        let offspring = self.crossover(elite, non_elite, rng);
+                        Self::decode_chromosome(decoder, offspring)
+                    }
+                },
+            )
+            .collect_into_vec(&mut dummy);
+        mem::swap(&mut dummy, &mut self.population1);
+
+        // copy elites (must after collect_into_vec)
+        for elite in &self.population[0..num_elites] {
+            self.population1.push(elite.clone());
+        }
+
+        // sort the new generation and swap backend vec.
+        Self::sort_population(&mut self.population1);
+        // TODO: we can reuse the memory of individual's vector inside population vector.
+        self.population.clear();
+        mem::swap(&mut self.population, &mut self.population1);
     }
 
-    fn sort_population(population: &mut Vec<InnerChromosome<D::Solution>>) {
-        population.sort_unstable_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap());
+    fn init_first_generation(&mut self) {
+        let decoder_factory = &self.decoder_factory;
+        let generator = &self.generator;
+        (0..self.params.population_size)
+            .into_par_iter()
+            .map_init(decoder_factory, |decoder, _| {
+                Self::decode_chromosome(decoder, generator.generate_individual())
+            })
+            .collect_into_vec(&mut self.population);
+        Self::sort_population(&mut self.population);
     }
 }
 
-#[derive(Clone)]
-struct InnerChromosome<S: Clone> {
-    chromosome: Chromosome,
-    solution: S,
-    fitness: f64,
+#[cfg(not(feature = "rayon"))]
+impl<G, D, F> Solver<G, D, F>
+where
+    G: Generator,
+    D: Decoder,
+    F: Fn() -> D,
+{
+    define_solve_and_new!();
+
+    fn init_first_generation(&mut self) {
+        let mut decoder = (self.decoder_factory)();
+        let generator = &self.generator;
+        self.population.extend(
+            (0..self.params.population_size)
+                .map(|_| Self::decode_chromosome(&mut decoder, generator.generate_individual())),
+        );
+        Self::sort_population(&mut self.population);
+    }
+
+    fn evolve_new_generation(&mut self) {
+        let mut decoder = (self.decoder_factory)();
+        let mut rng = thread_rng();
+        let num_elites = self.params.num_elites;
+        let num_mutants = self.params.num_mutants;
+        let num_offsprings = self.params.population_size - num_elites - num_mutants;
+
+        // copy elites to next generation.
+        for elite in &self.population[0..num_elites] {
+            self.population1.push(elite.clone());
+        }
+
+        // generate mutants from generator.
+        for _ in 0..num_mutants {
+            let mutant = self.generator.generate_individual();
+            let mutant = Self::decode_chromosome(&mut decoder, mutant);
+            self.population1.push(mutant);
+        }
+
+        // crossover offsprings.
+        for _ in 0..num_offsprings {
+            let (elite, non_elite) = self.pickup_parents_for_crossover(&mut rng);
+            let offspring = self.crossover(elite, non_elite, &mut rng);
+            self.population1
+                .push(Self::decode_chromosome(&mut decoder, offspring));
+        }
+
+        // sort the new generation and swap backend vec.
+        Self::sort_population(&mut self.population1);
+        // TODO: we can reuse the memory of individual's vector inside population vector.
+        self.population.clear();
+        mem::swap(&mut self.population, &mut self.population1);
+    }
 }

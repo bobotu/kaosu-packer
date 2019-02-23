@@ -17,14 +17,18 @@
 use std::iter;
 use std::path::Path;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::Criterion;
 use serde::*;
 
 use kaosu_packer::geom::Cuboid;
 use kaosu_packer::*;
 
-criterion_group!(benches, pack_easy, pack_medium, pack_hard);
-criterion_main!(benches);
+fn main() {
+    let mut criterion = Criterion::default().sample_size(25).configure_from_args();
+    pack_easy(&mut criterion);
+    pack_medium(&mut criterion);
+    pack_hard(&mut criterion);
+}
 
 fn pack_easy(c: &mut Criterion) {
     let items = load_items("testdata/easy.csv");
