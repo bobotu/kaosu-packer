@@ -1,6 +1,7 @@
 visualizer/static/packer.*
 visualizer/build
 
+Cargo.lock
 /target
 **/*.rs.bk
 
