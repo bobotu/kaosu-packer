@@ -1,9 +1,15 @@
 [package]
 name = "kaosu-packer"
-description = "あばばばばばばばばば"
+description = "A biased random key genetic algorithm for 2D and 3D bin packing problems"
 version = "0.1.0"
 authors = ["Zejun Li <me@zejun.li>"]
 edition = "2018"
+repository = "https://github.com/bobotu/kaosu-packer"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["3d-bin-packing"]
+categories = ["algorithms"]
+exclude = [".gitignore"]
 
 [features]
 default = ["rayon"]
