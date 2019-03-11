@@ -1,5 +1,5 @@
 # kaosu-packer
-`kaosu-packer` is a 3d bin packing problem solver based on `The packing algorithm is based on J. F. Gonçalves and M. G. C. Resende, “A biased random key genetic algorithm for 2D and 3D bin packing problems,” International Journal of Production Economics, vol. 145, no. 2, pp. 500–510, Oct. 2013.`
+`kaosu-packer` is a 3d bin packing problem solver based on `J. F. Gonçalves and M. G. C. Resende, “A biased random key genetic algorithm for 2D and 3D bin packing problems,” International Journal of Production Economics, vol. 145, no. 2, pp. 500–510, Oct. 2013.`
 
 There is also a WebAssembly based solution [visualizer](./visualizer). 
 
