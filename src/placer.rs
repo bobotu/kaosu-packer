@@ -241,12 +241,14 @@ impl InnerBin {
         let container_upper_right = Point::new(self.spec.width, self.spec.depth, self.spec.height);
 
         for ems in &self.empty_space_list {
-            for o in orientations.iter().filter(|o| o.can_fit_in(ems)) {
-                let box_upper_right = Space::from_placement(ems.origin(), o).upper_right;
-                let dist = container_upper_right.distance2_from(&box_upper_right);
-                if dist > max_dist {
-                    max_dist = dist;
-                    best_ems = Some(ems);
+            if ems.volume() >= cuboid.volume() {
+                for o in orientations.iter().filter(|o| o.can_fit_in(ems)) {
+                    let box_upper_right = Space::from_placement(ems.origin(), o).upper_right;
+                    let dist = container_upper_right.distance2_from(&box_upper_right);
+                    if dist > max_dist {
+                        max_dist = dist;
+                        best_ems = Some(ems);
+                    }
                 }
             }
         }
